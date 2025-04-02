@@ -1,0 +1,159 @@
+#chemistry-calculator {
+    font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    max-width: 600px;
+    margin: 30px auto;
+    padding: 25px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+    text-align: center;
+  }
+  
+  .calculator-title {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 24px;
+    font-weight: 600;
+  }
+  
+  .input-group {
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  
+  label {
+    display: block;
+    margin: 15px 0 8px;
+    font-weight: 500;
+    color: #34495e;
+    font-size: 15px;
+  }
+  
+  input[type="number"] {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 5px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+  }
+  
+  input[type="number"]:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+  }
+  
+  .reaction-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 25px 0;
+    padding: 15px;
+    background-color: #f8fafc;
+    border-radius: 10px;
+    min-height: 60px;
+  }
+  
+  .reaction-input {
+    width: 60px;
+    text-align: center;
+    font-size: 16px;
+    margin: 0 8px;
+    padding: 8px;
+    background-color: white;
+  }
+  
+  .reaction-display, .rate-law-display {
+    margin: 20px 0;
+    padding: 15px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #2c3e50;
+    text-align: center;
+    background-color: #f8fafc;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .rate-law-display {
+    border-left-color: #e74c3c;
+    font-family: 'Courier New', monospace;
+  }
+  
+  .custom-rate-controls {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #f8fafc;
+    border-radius: 8px;
+    border-left: 4px solid #2ecc71;
+  }
+  
+  .custom-rate-result {
+    margin: 20px 0;
+    padding: 15px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #2c3e50;
+    text-align: center;
+    background-color: #f8fafc;
+    border-radius: 8px;
+    border-left: 4px solid #9b59b6;
+    font-family: 'Courier New', monospace;
+  }
+  
+  button {
+    width: 100%;
+    padding: 14px;
+    margin: 10px 0 15px;
+    border: none;
+    border-radius: 8px;
+    background-color: #3498db;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
+  }
+  
+  button:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(52, 152, 219, 0.3);
+  }
+  
+  button:active {
+    transform: translateY(0);
+  }
+  
+  .arrow {
+    font-size: 20px;
+    margin: 0 10px;
+    color: #7f8c8d;
+  }
+  
+  .small-button {
+    width: auto;
+    padding: 8px 15px;
+    margin: 10px 5px;
+    background-color: #2ecc71;
+  }
+  
+  .small-button:hover {
+    background-color: #27ae60;
+  }
+  
+  @media (max-width: 480px) {
+    #chemistry-calculator {
+      padding: 15px;
+    }
+    
+    .reaction-input {
+      width: 50px;
+      margin: 0 5px;
+    }
+  }
