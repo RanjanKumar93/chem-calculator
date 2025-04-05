@@ -4,12 +4,16 @@ import "./ChemistryCalculator.css";
 const ChemistryCalculator = () => {
   const [reactantsCount, setReactantsCount] = useState(2);
   const [productsCount, setProductsCount] = useState(2);
+  const [nonReactingCount, setNonReactingCount] = useState(0);
   const [reactantCoefficients, setReactantCoefficients] = useState([1, 1]);
   const [productCoefficients, setProductCoefficients] = useState([1, 1]);
   const [reactantExponents, setReactantExponents] = useState([1, 1]);
   const [productExponents, setProductExponents] = useState([0, 0]);
   const [reactantInitialAmounts, setReactantInitialAmounts] = useState([1, 1]);
   const [productInitialAmounts, setProductInitialAmounts] = useState([0, 0]);
+  const [nonReactingInitialAmounts, setNonReactingInitialAmounts] = useState(
+    []
+  );
   const [customK, setCustomK] = useState(1);
   const [showCustomRate, setShowCustomRate] = useState(false);
   const [customRateLaw, setCustomRateLaw] = useState("");
@@ -28,6 +32,9 @@ const ChemistryCalculator = () => {
     // Initialize initial amounts
     const newReactantInitialAmounts = Array(parseInt(reactantsCount)).fill(1);
     const newProductInitialAmounts = Array(parseInt(productsCount)).fill(0);
+    const newNonReactingInitialAmounts = Array(parseInt(nonReactingCount)).fill(
+      0
+    );
 
     setReactantCoefficients(newReactantCoefficients);
     setProductCoefficients(newProductCoefficients);
@@ -35,6 +42,7 @@ const ChemistryCalculator = () => {
     setProductExponents(newProductExponents);
     setReactantInitialAmounts(newReactantInitialAmounts);
     setProductInitialAmounts(newProductInitialAmounts);
+    setNonReactingInitialAmounts(newNonReactingInitialAmounts);
     setShowCustomRate(false);
     setShowStoichiometricTable(false);
     setReactionGenerated(true);
@@ -64,10 +72,14 @@ const ChemistryCalculator = () => {
       const newAmounts = [...reactantInitialAmounts];
       newAmounts[index] = valueNum;
       setReactantInitialAmounts(newAmounts);
-    } else {
+    } else if (type === "product") {
       const newAmounts = [...productInitialAmounts];
       newAmounts[index] = valueNum;
       setProductInitialAmounts(newAmounts);
+    } else {
+      const newAmounts = [...nonReactingInitialAmounts];
+      newAmounts[index] = valueNum;
+      setNonReactingInitialAmounts(newAmounts);
     }
   };
 
@@ -93,7 +105,6 @@ const ChemistryCalculator = () => {
         allTerms.push({
           species: `A<sub>${index + 1}</sub>`,
           exponent: exp,
-          amount: reactantInitialAmounts[index],
         });
       }
     });
@@ -104,7 +115,6 @@ const ChemistryCalculator = () => {
         allTerms.push({
           species: `B<sub>${index + 1}</sub>`,
           exponent: exp,
-          amount: productInitialAmounts[index],
         });
       }
     });
@@ -115,13 +125,7 @@ const ChemistryCalculator = () => {
         .map((term) => `[${term.species}]<sup>${term.exponent}</sup>`)
         .join(" × ");
 
-    // Calculate actual rate value
-    let rateValue = customK;
-    allTerms.forEach((term) => {
-      rateValue *= Math.pow(term.amount, term.exponent);
-    });
-
-    setCustomRateLaw(`${rateLaw} = ${rateValue.toFixed(4)} M/s`);
+    setCustomRateLaw(rateLaw);
     setShowCustomRate(true);
   };
 
@@ -142,6 +146,18 @@ const ChemistryCalculator = () => {
   const renderStoichiometricTable = () => {
     if (!showStoichiometricTable) return null;
 
+    // Find limiting reactant
+    let limitingIndex = -1;
+    let minRatio = Infinity;
+
+    reactantInitialAmounts.forEach((amount, index) => {
+      const ratio = amount / reactantCoefficients[index];
+      if (ratio < minRatio) {
+        minRatio = ratio;
+        limitingIndex = index;
+      }
+    });
+
     return (
       <div className="stoichiometric-table">
         <h3>Stoichiometric Table</h3>
@@ -158,34 +174,52 @@ const ChemistryCalculator = () => {
             {/* Reactants */}
             {reactantCoefficients.map((coeff, index) => (
               <tr key={`reactant-row-${index}`}>
-                <td>A<sub>{index + 1}</sub></td>
+                <td>
+                  A<sub>{index + 1}</sub>
+                </td>
                 <td>{reactantInitialAmounts[index].toFixed(2)}</td>
                 <td>-{coeff}ξ</td>
                 <td>
-                  {reactantInitialAmounts[index] >= coeff
-                    ? `${(reactantInitialAmounts[index] - coeff).toFixed(2)} - ξ`
-                    : "0 (limiting)"}
+                  {index === limitingIndex
+                    ? "0 (limiting)"
+                    : `${(
+                        reactantInitialAmounts[index] -
+                        coeff * minRatio
+                      ).toFixed(2)}`}
                 </td>
               </tr>
             ))}
-            
+
             {/* Products */}
             {productCoefficients.map((coeff, index) => (
               <tr key={`product-row-${index}`}>
-                <td>B<sub>{index + 1}</sub></td>
+                <td>
+                  B<sub>{index + 1}</sub>
+                </td>
                 <td>{productInitialAmounts[index].toFixed(2)}</td>
                 <td>+{coeff}ξ</td>
                 <td>
-                  {productInitialAmounts[index] > 0
-                    ? `${(productInitialAmounts[index] + coeff).toFixed(2)} + ξ`
-                    : `${coeff}ξ`}
+                  {(productInitialAmounts[index] + coeff * minRatio).toFixed(2)}
                 </td>
+              </tr>
+            ))}
+
+            {/* Non-reacting elements */}
+            {nonReactingInitialAmounts.map((amount, index) => (
+              <tr key={`nonreacting-row-${index}`}>
+                <td>
+                  I<sub>{index + 1}</sub>
+                </td>
+                <td>{amount.toFixed(2)}</td>
+                <td>0</td>
+                <td>{amount.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="table-note">
           Note: ξ represents the extent of reaction (in moles per liter).
+          {limitingIndex >= 0 && ` Limiting reactant: A${limitingIndex + 1}`}
         </p>
       </div>
     );
@@ -317,6 +351,33 @@ const ChemistryCalculator = () => {
             />
           </div>
         ))}
+
+        {nonReactingCount > 0 && (
+          <>
+            <h4>Non-Reacting Elements</h4>
+            {nonReactingInitialAmounts.map((amount, index) => (
+              <div className="input-group" key={`nonreacting-amount-${index}`}>
+                <label htmlFor={`nonreacting-amount-${index}`}>
+                  Initial [I<sub>{index + 1}</sub>]:
+                </label>
+                <input
+                  type="number"
+                  id={`nonreacting-amount-${index}`}
+                  step="0.1"
+                  min="0"
+                  value={amount}
+                  onChange={(e) =>
+                    handleInitialAmountChange(
+                      "nonreacting",
+                      index,
+                      e.target.value
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </>
+        )}
       </div>
     );
   };
@@ -332,7 +393,7 @@ const ChemistryCalculator = () => {
             id="custom-k"
             step="0.01"
             value={customK}
-            onChange={(e) => setCustomK(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setCustomK(parseFloat(e.target.value) || 1)}
           />
         </div>
 
@@ -389,6 +450,22 @@ const ChemistryCalculator = () => {
     );
   };
 
+  const renderNonReactingSection = () => {
+    return (
+      <div className="input-group">
+        <label htmlFor="nonreacting">Number of Non-Reacting Elements</label>
+        <input
+          type="number"
+          id="nonreacting"
+          min="0"
+          max="5"
+          value={nonReactingCount}
+          onChange={(e) => setNonReactingCount(parseInt(e.target.value) || 0)}
+        />
+      </div>
+    );
+  };
+
   return (
     <div id="chemistry-calculator">
       <div className="calculator-title">Chemistry Reaction Calculator</div>
@@ -417,29 +494,32 @@ const ChemistryCalculator = () => {
         />
       </div>
 
+      {renderNonReactingSection()}
+
       <button onClick={generateReaction}>Generate Reaction</button>
 
       {reactionGenerated && (
         <>
           {renderReaction()}
-          {reactantCoefficients.length > 0 && productCoefficients.length > 0 && (
-            <>
-              {renderFullReaction()}
-              {renderInitialAmountControls()}
-              {renderRateLawControls()}
-              
-              {showCustomRate && (
-                <button 
-                  className="stoichiometric-button"
-                  onClick={generateStoichiometricTable}
-                >
-                  Generate Stoichiometric Table
-                </button>
-              )}
-              
-              {renderStoichiometricTable()}
-            </>
-          )}
+          {reactantCoefficients.length > 0 &&
+            productCoefficients.length > 0 && (
+              <>
+                {renderFullReaction()}
+                {renderInitialAmountControls()}
+                {renderRateLawControls()}
+
+                {showCustomRate && (
+                  <button
+                    className="stoichiometric-button"
+                    onClick={generateStoichiometricTable}
+                  >
+                    Generate Stoichiometric Table
+                  </button>
+                )}
+
+                {renderStoichiometricTable()}
+              </>
+            )}
         </>
       )}
     </div>
@@ -560,7 +640,7 @@ export default ChemistryCalculator;
 //     });
 
 //     const rateLaw =
-//       `Custom Rate = ${customK} ` +
+//       `Rate = ${customK} ` +
 //       allTerms
 //         .map((term) => `[${term.species}]<sup>${term.exponent}</sup>`)
 //         .join(" × ");
@@ -608,21 +688,27 @@ export default ChemistryCalculator;
 //             {/* Reactants */}
 //             {reactantCoefficients.map((coeff, index) => (
 //               <tr key={`reactant-row-${index}`}>
-//                 <td>A<sub>{index + 1}</sub></td>
+//                 <td>
+//                   A<sub>{index + 1}</sub>
+//                 </td>
 //                 <td>{reactantInitialAmounts[index].toFixed(2)}</td>
 //                 <td>-{coeff}ξ</td>
 //                 <td>
 //                   {reactantInitialAmounts[index] >= coeff
-//                     ? `${(reactantInitialAmounts[index] - coeff).toFixed(2)} - ξ`
+//                     ? `${(reactantInitialAmounts[index] - coeff).toFixed(
+//                         2
+//                       )} - ξ`
 //                     : "0 (limiting)"}
 //                 </td>
 //               </tr>
 //             ))}
-            
+
 //             {/* Products */}
 //             {productCoefficients.map((coeff, index) => (
 //               <tr key={`product-row-${index}`}>
-//                 <td>B<sub>{index + 1}</sub></td>
+//                 <td>
+//                   B<sub>{index + 1}</sub>
+//                 </td>
 //                 <td>{productInitialAmounts[index].toFixed(2)}</td>
 //                 <td>+{coeff}ξ</td>
 //                 <td>
@@ -725,43 +811,6 @@ export default ChemistryCalculator;
 //     );
 //   };
 
-//   const renderRateLaw = () => {
-//     const allTerms = [];
-
-//     // Add reactant terms
-//     for (let i = 0; i < reactantExponents.length; i++) {
-//       if (reactantExponents[i] !== 0) {
-//         allTerms.push({
-//           species: `A<sub>${i + 1}</sub>`,
-//           exponent: reactantExponents[i],
-//         });
-//       }
-//     }
-
-//     // Add product terms
-//     for (let i = 0; i < productExponents.length; i++) {
-//       if (productExponents[i] !== 0) {
-//         allTerms.push({
-//           species: `B<sub>${i + 1}</sub>`,
-//           exponent: productExponents[i],
-//         });
-//       }
-//     }
-
-//     const rateLaw =
-//       `Rate = k ` +
-//       allTerms
-//         .map((term) => `[${term.species}]<sup>${term.exponent}</sup>`)
-//         .join(" × ");
-
-//     return (
-//       <div
-//         className="rate-law-display"
-//         dangerouslySetInnerHTML={{ __html: rateLaw }}
-//       />
-//     );
-//   };
-
 //   const renderInitialAmountControls = () => {
 //     return (
 //       <div className="initial-amount-controls">
@@ -808,10 +857,10 @@ export default ChemistryCalculator;
 //     );
 //   };
 
-//   const renderCustomRateControls = () => {
+//   const renderRateLawControls = () => {
 //     return (
-//       <div className="custom-rate-controls">
-//         <h3>Customize Rate Law</h3>
+//       <div className="rate-law-section">
+//         <h3>Rate Law Parameters</h3>
 //         <div className="input-group">
 //           <label htmlFor="custom-k">Rate Constant (k):</label>
 //           <input
@@ -859,12 +908,19 @@ export default ChemistryCalculator;
 //           </div>
 //         ))}
 
-//         <button className="small-button" onClick={calculateCustomRate}>
-//           Calculate Custom Rate
+//         <button className="calculate-button" onClick={calculateCustomRate}>
+//           Calculate Rate Law
 //         </button>
 //         <button className="small-button" onClick={resetToOriginal}>
-//           Reset to Original
+//           Reset Exponents
 //         </button>
+
+//         {showCustomRate && (
+//           <div
+//             className="rate-law-result"
+//             dangerouslySetInnerHTML={{ __html: customRateLaw }}
+//           />
+//         )}
 //       </div>
 //     );
 //   };
@@ -902,29 +958,25 @@ export default ChemistryCalculator;
 //       {reactionGenerated && (
 //         <>
 //           {renderReaction()}
-//           {reactantCoefficients.length > 0 && productCoefficients.length > 0 && (
-//             <>
-//               {renderFullReaction()}
-//               {renderRateLaw()}
-//               {renderInitialAmountControls()}
-              
-//               <button 
-//                 className="stoichiometric-button"
-//                 onClick={generateStoichiometricTable}
-//               >
-//                 Generate Stoichiometric Table
-//               </button>
-              
-//               {renderStoichiometricTable()}
-//               {renderCustomRateControls()}
-//               {showCustomRate && (
-//                 <div
-//                   className="custom-rate-result"
-//                   dangerouslySetInnerHTML={{ __html: customRateLaw }}
-//                 />
-//               )}
-//             </>
-//           )}
+//           {reactantCoefficients.length > 0 &&
+//             productCoefficients.length > 0 && (
+//               <>
+//                 {renderFullReaction()}
+//                 {renderInitialAmountControls()}
+//                 {renderRateLawControls()}
+
+//                 {showCustomRate && (
+//                   <button
+//                     className="stoichiometric-button"
+//                     onClick={generateStoichiometricTable}
+//                   >
+//                     Generate Stoichiometric Table
+//                   </button>
+//                 )}
+
+//                 {renderStoichiometricTable()}
+//               </>
+//             )}
 //         </>
 //       )}
 //     </div>
@@ -932,4 +984,3 @@ export default ChemistryCalculator;
 // };
 
 // export default ChemistryCalculator;
-
