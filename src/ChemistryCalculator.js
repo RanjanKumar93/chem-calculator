@@ -11,26 +11,99 @@ const ChemistryCalculator = () => {
   const [productExponents, setProductExponents] = useState([0, 0]);
   const [reactantInitialAmounts, setReactantInitialAmounts] = useState([1, 1]);
   const [productInitialAmounts, setProductInitialAmounts] = useState([0, 0]);
-  const [nonReactingInitialAmounts, setNonReactingInitialAmounts] = useState([]);
+  const [nonReactingInitialAmounts, setNonReactingInitialAmounts] = useState(
+    []
+  );
   const [customK, setCustomK] = useState("k");
   const [showCustomRate, setShowCustomRate] = useState(false);
   const [customRateLaw, setCustomRateLaw] = useState("");
   const [reactionGenerated, setReactionGenerated] = useState(false);
   const [showStoichiometricTable, setShowStoichiometricTable] = useState(false);
+  const [initialVolumetricFlow, setInitialVolumetricFlow] = useState(1.0); // Changed from "v₀" to 1.0
+  const [initialPressure, setInitialPressure] = useState("P₀");
+  const [initialTemperature, setInitialTemperature] = useState("T₀");
+  const [finalPressure, setFinalPressure] = useState("P");
+  const [finalTemperature, setFinalTemperature] = useState("T");
+
+  const [numericalExtent, setNumericalExtent] = useState(0);
+  const [showNumericalTable, setShowNumericalTable] = useState(false);
+
+  // Helper function to check if a value is numeric
+  const isNumeric = (value) => {
+    return !isNaN(parseFloat(value)) && isFinite(value);
+  };
+
+  // Helper function to format values - shows expression if not numeric
+  const formatValue = (value, defaultValue = "") => {
+    if (value === undefined || value === null) return defaultValue;
+    if (isNumeric(value)) return parseFloat(value).toFixed(4);
+    return value.toString();
+  };
+
+  // Helper function to multiply values while preserving symbols
+  const multiplyValues = (a, b) => {
+    const numA = parseFloat(a);
+    const numB = parseFloat(b);
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+      return (numA * numB).toString();
+    }
+
+    if (a === "0" || b === "0") return "0";
+    if (a === "1") return b;
+    if (b === "1") return a;
+
+    // Special case: if one is a number and the other is symbolic
+    if (!isNaN(numA)) return `${numA}×${b}`;
+    if (!isNaN(numB)) return `${a}×${numB}`;
+
+    return `${a}×${b}`;
+  };
+
+  const addValues = (a, b) => {
+    const numA = parseFloat(a);
+    const numB = parseFloat(b);
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+      return (numA + numB).toString();
+    }
+
+    if (a === "0") return b;
+    if (b === "0") return a;
+
+    // Special case: if one is a number and the other is symbolic
+    if (!isNaN(numA)) return `${numA}+${b}`;
+    if (!isNaN(numB)) return `${a}+${numB}`;
+
+    return `${a}+${b}`;
+  };
+
+  // Helper function to divide values while preserving symbols
+  const divideValues = (a, b) => {
+    const numA = parseFloat(a);
+    const numB = parseFloat(b);
+
+    if (!isNaN(numA) && !isNaN(numB)) {
+      if (numB === 0) return "∞";
+      return (numA / numB).toString();
+    }
+
+    if (a === "0") return "0";
+    if (b === "1") return a;
+
+    return `${a}/${b}`;
+  };
 
   const generateReaction = () => {
-    // Initialize coefficients
     const newReactantCoefficients = Array(parseInt(reactantsCount)).fill(1);
     const newProductCoefficients = Array(parseInt(productsCount)).fill(1);
-
-    // Initialize exponents (reactants start at 1, products at 0)
     const newReactantExponents = Array(parseInt(reactantsCount)).fill(1);
     const newProductExponents = Array(parseInt(productsCount)).fill(0);
-
-    // Initialize initial amounts
     const newReactantInitialAmounts = Array(parseInt(reactantsCount)).fill(1);
     const newProductInitialAmounts = Array(parseInt(productsCount)).fill(0);
-    const newNonReactingInitialAmounts = Array(parseInt(nonReactingCount)).fill(0);
+    const newNonReactingInitialAmounts = Array(parseInt(nonReactingCount)).fill(
+      0
+    );
 
     setReactantCoefficients(newReactantCoefficients);
     setProductCoefficients(newProductCoefficients);
@@ -44,6 +117,10 @@ const ChemistryCalculator = () => {
     setReactionGenerated(true);
   };
 
+  const calculateWithExtent = () => {
+    setShowNumericalTable(true);
+  };
+
   const handleCoefficientChange = (type, index, value) => {
     const valueNum = parseFloat(value) || 0;
     if (type === "reactant") {
@@ -51,7 +128,6 @@ const ChemistryCalculator = () => {
       newCoefficients[index] = valueNum;
       setReactantCoefficients(newCoefficients);
 
-      // Update exponents to match coefficients by default
       const newExponents = [...reactantExponents];
       newExponents[index] = valueNum;
       setReactantExponents(newExponents);
@@ -95,7 +171,6 @@ const ChemistryCalculator = () => {
   const calculateCustomRate = () => {
     const allTerms = [];
 
-    // Add reactant terms
     reactantExponents.forEach((exp, index) => {
       if (exp !== 0) {
         allTerms.push({
@@ -105,7 +180,6 @@ const ChemistryCalculator = () => {
       }
     });
 
-    // Add product terms
     productExponents.forEach((exp, index) => {
       if (exp !== 0) {
         allTerms.push({
@@ -142,63 +216,125 @@ const ChemistryCalculator = () => {
   const renderStoichiometricTable = () => {
     if (!showStoichiometricTable) return null;
 
+    // Calculate final volumetric flow rate (dm³/s) as an expression
+    const pressureRatio = divideValues(initialPressure, finalPressure);
+    const temperatureRatio = divideValues(finalTemperature, initialTemperature);
+    const finalVolumetricFlow = multiplyValues(
+      multiplyValues(initialVolumetricFlow, pressureRatio),
+      temperatureRatio
+    );
+
+    // Calculate total initial molar flow rate (sum of all initial flows)
+    const totalInitialMolarFlow =
+      (reactantInitialAmounts.reduce((sum, amount) => sum + amount, 0) +
+        productInitialAmounts.reduce((sum, amount) => sum + amount, 0) +
+        nonReactingInitialAmounts.reduce((sum, amount) => sum + amount, 0)) *
+      initialVolumetricFlow;
+
+    // Calculate the coefficient for ξ in total molar flow
+    const xiCoefficient =
+      productCoefficients.reduce((sum, coeff) => sum + coeff, 0) -
+      reactantCoefficients.reduce((sum, coeff) => sum + coeff, 0);
+
     return (
       <div className="stoichiometric-table">
-        <h3>Stoichiometric Table</h3>
+        <h3>Stoichiometric Table (Molar Flow Rates in mol/s)</h3>
         <table>
           <thead>
             <tr>
               <th>Species</th>
-              <th>Initial Amount (M)</th>
-              <th>Change (M)</th>
-              <th>Final Amount (M)</th>
+              <th>Initial Flow Rate (F₀)</th>
+              <th>Change (ΔF)</th>
+              <th>Final Flow Rate (F)</th>
             </tr>
           </thead>
           <tbody>
             {/* Reactants */}
-            {reactantCoefficients.map((coeff, index) => (
-              <tr key={`reactant-row-${index}`}>
-                <td>
-                  A<sub>{index + 1}</sub>
-                </td>
-                <td>{reactantInitialAmounts[index].toFixed(2)}</td>
-                <td>-{coeff}ξ</td>
-                <td>
-                  {reactantInitialAmounts[index].toFixed(2)} - {coeff}ξ
-                </td>
-              </tr>
-            ))}
+            {reactantCoefficients.map((coeff, index) => {
+              const initialFlow = (
+                reactantInitialAmounts[index] * initialVolumetricFlow
+              ).toFixed(4);
+              const change = `-${coeff}ξ`;
+              const finalFlow = `${initialFlow} - ${coeff}ξ`;
+              return (
+                <tr key={`reactant-row-${index}`}>
+                  <td>
+                    A<sub>{index + 1}</sub>
+                  </td>
+                  <td>{initialFlow}</td>
+                  <td>{change}</td>
+                  <td>{finalFlow}</td>
+                </tr>
+              );
+            })}
 
             {/* Products */}
-            {productCoefficients.map((coeff, index) => (
-              <tr key={`product-row-${index}`}>
-                <td>
-                  B<sub>{index + 1}</sub>
-                </td>
-                <td>{productInitialAmounts[index].toFixed(2)}</td>
-                <td>{productInitialAmounts[index] > 0 ? "+" : ""}{coeff}ξ</td>
-                <td>
-                  {productInitialAmounts[index].toFixed(2)} + {coeff}ξ
-                </td>
-              </tr>
-            ))}
+            {productCoefficients.map((coeff, index) => {
+              const initialFlow = (
+                productInitialAmounts[index] * initialVolumetricFlow
+              ).toFixed(4);
+              const change = `+${coeff}ξ`;
+              const finalFlow = `${initialFlow} + ${coeff}ξ`;
+              return (
+                <tr key={`product-row-${index}`}>
+                  <td>
+                    B<sub>{index + 1}</sub>
+                  </td>
+                  <td>{initialFlow}</td>
+                  <td>{change}</td>
+                  <td>{finalFlow}</td>
+                </tr>
+              );
+            })}
 
             {/* Non-reacting elements */}
-            {nonReactingInitialAmounts.map((amount, index) => (
-              <tr key={`nonreacting-row-${index}`}>
-                <td>
-                  I<sub>{index + 1}</sub>
-                </td>
-                <td>{amount.toFixed(2)}</td>
-                <td>0</td>
-                <td>{amount.toFixed(2)}</td>
-              </tr>
-            ))}
+            {nonReactingInitialAmounts.map((amount, index) => {
+              const initialFlow = (amount * initialVolumetricFlow).toFixed(4);
+              return (
+                <tr key={`nonreacting-row-${index}`}>
+                  <td>
+                    I<sub>{index + 1}</sub>
+                  </td>
+                  <td>{initialFlow}</td>
+                  <td>0</td>
+                  <td>{initialFlow}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        <p className="table-note">
-          Note: ξ represents the extent of reaction (in moles per liter).
-        </p>
+
+        <div className="total-flow-section">
+          <h4>Total Molar Flow Rate Calculations</h4>
+          <p>
+            <strong>
+              Total Initial Molar Flow Rate (F<sub>total,0</sub>):
+            </strong>{" "}
+            {totalInitialMolarFlow.toFixed(4)} mol/s
+          </p>
+          <p>
+            <strong>
+              Total Final Molar Flow Rate (F<sub>total</sub>):
+            </strong>
+            <br />F<sub>total</sub> = F<sub>total,0</sub> + (Σproduct
+            coefficients - Σreactant coefficients)ξ
+          </p>
+          <p>
+            F<sub>total</sub> = {totalInitialMolarFlow.toFixed(4)} + (
+            {xiCoefficient})ξ
+          </p>
+        </div>
+
+        <div className="volumetric-flow-calculation">
+          <h4>Final Volumetric Flow Rate Calculation</h4>
+          <p>
+            V = {initialVolumetricFlow} × ({initialPressure}/{finalPressure}) ×
+            ({finalTemperature}/{initialTemperature})
+          </p>
+          <p>
+            <strong>Final Volumetric Flow Rate: {finalVolumetricFlow}</strong>
+          </p>
+        </div>
       </div>
     );
   };
@@ -248,6 +384,144 @@ const ChemistryCalculator = () => {
         {reactantParts}
         <span className="arrow">→</span>
         {productParts}
+      </div>
+    );
+  };
+
+  const renderNumericalStoichiometricTable = () => {
+    if (!showNumericalTable || !showStoichiometricTable) return null;
+
+    // Calculate final volumetric flow rate (dm³/s)
+    const pressureRatio = divideValues(initialPressure, finalPressure);
+    const temperatureRatio = divideValues(finalTemperature, initialTemperature);
+    const finalVolumetricFlow = multiplyValues(
+      multiplyValues(initialVolumetricFlow, pressureRatio),
+      temperatureRatio
+    );
+
+    // Calculate total initial molar flow rate
+    const totalInitialMolarFlow =
+      (reactantInitialAmounts.reduce((sum, amount) => sum + amount, 0) +
+        productInitialAmounts.reduce((sum, amount) => sum + amount, 0) +
+        nonReactingInitialAmounts.reduce((sum, amount) => sum + amount, 0)) *
+      initialVolumetricFlow;
+
+    // Calculate the coefficient for ξ in total molar flow
+    const xiCoefficient =
+      productCoefficients.reduce((sum, coeff) => sum + coeff, 0) -
+      reactantCoefficients.reduce((sum, coeff) => sum + coeff, 0);
+
+    // Calculate total final molar flow rate with numerical extent
+    const totalFinalMolarFlow =
+      totalInitialMolarFlow + xiCoefficient * numericalExtent;
+
+    return (
+      <div className="numerical-stoichiometric-table">
+        <h3>
+          Stoichiometric Table with Numerical Extent (ξ = {numericalExtent})
+        </h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Species</th>
+              <th>Initial Flow Rate (F₀)</th>
+              <th>Change (ΔF)</th>
+              <th>Final Flow Rate (F)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Reactants */}
+            {reactantCoefficients.map((coeff, index) => {
+              const initialFlow = (
+                reactantInitialAmounts[index] * initialVolumetricFlow
+              ).toFixed(4);
+              const change = -coeff * numericalExtent;
+              const finalFlow = (
+                reactantInitialAmounts[index] * initialVolumetricFlow -
+                coeff * numericalExtent
+              ).toFixed(4);
+              return (
+                <tr key={`numerical-reactant-row-${index}`}>
+                  <td>
+                    A<sub>{index + 1}</sub>
+                  </td>
+                  <td>{initialFlow}</td>
+                  <td>{change.toFixed(4)}</td>
+                  <td>{finalFlow}</td>
+                </tr>
+              );
+            })}
+
+            {/* Products */}
+            {productCoefficients.map((coeff, index) => {
+              const initialFlow = (
+                productInitialAmounts[index] * initialVolumetricFlow
+              ).toFixed(4);
+              const change = coeff * numericalExtent;
+              const finalFlow = (
+                productInitialAmounts[index] * initialVolumetricFlow +
+                coeff * numericalExtent
+              ).toFixed(4);
+              return (
+                <tr key={`numerical-product-row-${index}`}>
+                  <td>
+                    B<sub>{index + 1}</sub>
+                  </td>
+                  <td>{initialFlow}</td>
+                  <td>+{change.toFixed(4)}</td>
+                  <td>{finalFlow}</td>
+                </tr>
+              );
+            })}
+
+            {/* Non-reacting elements */}
+            {nonReactingInitialAmounts.map((amount, index) => {
+              const initialFlow = (amount * initialVolumetricFlow).toFixed(4);
+              return (
+                <tr key={`numerical-nonreacting-row-${index}`}>
+                  <td>
+                    I<sub>{index + 1}</sub>
+                  </td>
+                  <td>{initialFlow}</td>
+                  <td>0</td>
+                  <td>{initialFlow}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="total-flow-section">
+          <h4>Total Molar Flow Rate Calculations</h4>
+          <p>
+            <strong>
+              Total Initial Molar Flow Rate (F<sub>total,0</sub>):
+            </strong>{" "}
+            {totalInitialMolarFlow.toFixed(4)} mol/s
+          </p>
+          <p>
+            <strong>
+              Total Final Molar Flow Rate (F<sub>total</sub>):
+            </strong>{" "}
+            {totalFinalMolarFlow.toFixed(4)} mol/s
+          </p>
+          <p>
+            F<sub>total</sub> = {totalInitialMolarFlow.toFixed(4)} + (
+            {xiCoefficient}) × {numericalExtent} ={" "}
+            {totalFinalMolarFlow.toFixed(4)} mol/s
+          </p>
+        </div>
+
+        <div className="volumetric-flow-calculation">
+          <h4>Final Volumetric Flow Rate Calculation</h4>
+          <p>
+            V = {initialVolumetricFlow} × ({initialPressure}/{finalPressure}) ×
+            ({finalTemperature}/{initialTemperature})
+          </p>
+          <p>
+            <strong>Final Volumetric Flow Rate: {finalVolumetricFlow}</strong>
+          </p>
+        </div>
       </div>
     );
   };
@@ -339,7 +613,11 @@ const ChemistryCalculator = () => {
                   min="0"
                   value={amount}
                   onChange={(e) =>
-                    handleInitialAmountChange("nonreacting", index, e.target.value)
+                    handleInitialAmountChange(
+                      "nonreacting",
+                      index,
+                      e.target.value
+                    )
                   }
                 />
               </div>
@@ -433,6 +711,72 @@ const ChemistryCalculator = () => {
     );
   };
 
+  const renderProcessConditions = () => {
+    return (
+      <div className="process-conditions">
+        <h3>Process Conditions</h3>
+
+        <div className="input-group">
+          <label htmlFor="initial-flow">Initial Volumetric Flow (dm³/s):</label>
+          <input
+            type="number" // Changed from "text" to "number"
+            id="initial-flow"
+            step="0.1"
+            min="0"
+            value={initialVolumetricFlow}
+            onChange={(e) =>
+              setInitialVolumetricFlow(parseFloat(e.target.value) || 0)
+            }
+          />
+        </div>
+
+        <div className="input-group">
+          <label htmlFor="initial-pressure">Initial Pressure (atm):</label>
+          <input
+            type="text"
+            id="initial-pressure"
+            value={initialPressure}
+            onChange={(e) => setInitialPressure(e.target.value)}
+          />
+        </div>
+
+        <div className="input-group">
+          <label htmlFor="initial-temperature">Initial Temperature (K):</label>
+          <input
+            type="text"
+            id="initial-temperature"
+            value={initialTemperature}
+            onChange={(e) => setInitialTemperature(e.target.value)}
+          />
+        </div>
+
+        <div className="input-group">
+          <label htmlFor="final-pressure">Final Pressure (atm):</label>
+          <input
+            type="text"
+            id="final-pressure"
+            value={finalPressure}
+            onChange={(e) => setFinalPressure(e.target.value)}
+          />
+        </div>
+
+        <div className="input-group">
+          <label htmlFor="final-temperature">Final Temperature (K):</label>
+          <input
+            type="text"
+            id="final-temperature"
+            value={finalTemperature}
+            onChange={(e) => setFinalTemperature(e.target.value)}
+          />
+        </div>
+        <div className="input-group">
+          <label>Extent of Reaction:</label>
+          <span className="extent-display">ξ</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div id="chemistry-calculator">
       <div className="calculator-title">Chemistry Reaction Calculator</div>
@@ -462,6 +806,7 @@ const ChemistryCalculator = () => {
       </div>
 
       {renderNonReactingSection()}
+      {renderProcessConditions()}
 
       <button onClick={generateReaction}>Generate Reaction</button>
 
@@ -485,6 +830,34 @@ const ChemistryCalculator = () => {
                 )}
 
                 {renderStoichiometricTable()}
+
+                {showStoichiometricTable && (
+                  <div className="numerical-extent-section">
+                    <h3>Calculate with Numerical Extent of Reaction</h3>
+                    <div className="input-group">
+                      <label htmlFor="numerical-extent">
+                        Extent of Reaction (ξ):
+                      </label>
+                      <input
+                        type="number"
+                        id="numerical-extent"
+                        step="0.1"
+                        min="0"
+                        value={numericalExtent}
+                        onChange={(e) =>
+                          setNumericalExtent(parseFloat(e.target.value) || 0)
+                        }
+                      />
+                    </div>
+                    <button
+                      className="calculate-button"
+                      onClick={calculateWithExtent}
+                    >
+                      Calculate with Extent
+                    </button>
+                    {renderNumericalStoichiometricTable()}
+                  </div>
+                )}
               </>
             )}
         </>
@@ -511,22 +884,88 @@ export default ChemistryCalculator;
 //   const [nonReactingInitialAmounts, setNonReactingInitialAmounts] = useState(
 //     []
 //   );
-//   const [customK, setCustomK] = useState(1);
+//   const [customK, setCustomK] = useState("k");
 //   const [showCustomRate, setShowCustomRate] = useState(false);
 //   const [customRateLaw, setCustomRateLaw] = useState("");
 //   const [reactionGenerated, setReactionGenerated] = useState(false);
 //   const [showStoichiometricTable, setShowStoichiometricTable] = useState(false);
+//   const [initialVolumetricFlow, setInitialVolumetricFlow] = useState(1.0); // Changed from "v₀" to 1.0
+//   const [initialPressure, setInitialPressure] = useState("P₀");
+//   const [initialTemperature, setInitialTemperature] = useState("T₀");
+//   const [finalPressure, setFinalPressure] = useState("P");
+//   const [finalTemperature, setFinalTemperature] = useState("T");
+
+//   // Helper function to check if a value is numeric
+//   const isNumeric = (value) => {
+//     return !isNaN(parseFloat(value)) && isFinite(value);
+//   };
+
+//   // Helper function to format values - shows expression if not numeric
+//   const formatValue = (value, defaultValue = "") => {
+//     if (value === undefined || value === null) return defaultValue;
+//     if (isNumeric(value)) return parseFloat(value).toFixed(4);
+//     return value.toString();
+//   };
+
+//   // Helper function to multiply values while preserving symbols
+//   const multiplyValues = (a, b) => {
+//     const numA = parseFloat(a);
+//     const numB = parseFloat(b);
+
+//     if (!isNaN(numA) && !isNaN(numB)) {
+//       return (numA * numB).toString();
+//     }
+
+//     if (a === "0" || b === "0") return "0";
+//     if (a === "1") return b;
+//     if (b === "1") return a;
+
+//     // Special case: if one is a number and the other is symbolic
+//     if (!isNaN(numA)) return `${numA}×${b}`;
+//     if (!isNaN(numB)) return `${a}×${numB}`;
+
+//     return `${a}×${b}`;
+//   };
+
+//   const addValues = (a, b) => {
+//     const numA = parseFloat(a);
+//     const numB = parseFloat(b);
+
+//     if (!isNaN(numA) && !isNaN(numB)) {
+//       return (numA + numB).toString();
+//     }
+
+//     if (a === "0") return b;
+//     if (b === "0") return a;
+
+//     // Special case: if one is a number and the other is symbolic
+//     if (!isNaN(numA)) return `${numA}+${b}`;
+//     if (!isNaN(numB)) return `${a}+${numB}`;
+
+//     return `${a}+${b}`;
+//   };
+
+//   // Helper function to divide values while preserving symbols
+//   const divideValues = (a, b) => {
+//     const numA = parseFloat(a);
+//     const numB = parseFloat(b);
+
+//     if (!isNaN(numA) && !isNaN(numB)) {
+//       if (numB === 0) return "∞";
+//       return (numA / numB).toString();
+//     }
+
+//     if (a === "0") return "0";
+//     if (b === "1") return a;
+
+//     return `${a}/${b}`;
+//   };
 
 //   const generateReaction = () => {
-//     // Initialize coefficients
 //     const newReactantCoefficients = Array(parseInt(reactantsCount)).fill(1);
 //     const newProductCoefficients = Array(parseInt(productsCount)).fill(1);
-
-//     // Initialize exponents (reactants start at 1, products at 0)
 //     const newReactantExponents = Array(parseInt(reactantsCount)).fill(1);
 //     const newProductExponents = Array(parseInt(productsCount)).fill(0);
-
-//     // Initialize initial amounts
 //     const newReactantInitialAmounts = Array(parseInt(reactantsCount)).fill(1);
 //     const newProductInitialAmounts = Array(parseInt(productsCount)).fill(0);
 //     const newNonReactingInitialAmounts = Array(parseInt(nonReactingCount)).fill(
@@ -546,13 +985,12 @@ export default ChemistryCalculator;
 //   };
 
 //   const handleCoefficientChange = (type, index, value) => {
-//     const valueNum = parseInt(value) || 0;
+//     const valueNum = parseFloat(value) || 0;
 //     if (type === "reactant") {
 //       const newCoefficients = [...reactantCoefficients];
 //       newCoefficients[index] = valueNum;
 //       setReactantCoefficients(newCoefficients);
 
-//       // Update exponents to match coefficients by default
 //       const newExponents = [...reactantExponents];
 //       newExponents[index] = valueNum;
 //       setReactantExponents(newExponents);
@@ -596,7 +1034,6 @@ export default ChemistryCalculator;
 //   const calculateCustomRate = () => {
 //     const allTerms = [];
 
-//     // Add reactant terms
 //     reactantExponents.forEach((exp, index) => {
 //       if (exp !== 0) {
 //         allTerms.push({
@@ -606,7 +1043,6 @@ export default ChemistryCalculator;
 //       }
 //     });
 
-//     // Add product terms
 //     productExponents.forEach((exp, index) => {
 //       if (exp !== 0) {
 //         allTerms.push({
@@ -632,7 +1068,7 @@ export default ChemistryCalculator;
 
 //     setReactantExponents(newReactantExponents);
 //     setProductExponents(newProductExponents);
-//     setCustomK(1);
+//     setCustomK("k");
 //     setShowCustomRate(false);
 //   };
 
@@ -643,81 +1079,125 @@ export default ChemistryCalculator;
 //   const renderStoichiometricTable = () => {
 //     if (!showStoichiometricTable) return null;
 
-//     // Find limiting reactant
-//     let limitingIndex = -1;
-//     let minRatio = Infinity;
+//     // Calculate final volumetric flow rate (dm³/s) as an expression
+//     const pressureRatio = divideValues(initialPressure, finalPressure);
+//     const temperatureRatio = divideValues(finalTemperature, initialTemperature);
+//     const finalVolumetricFlow = multiplyValues(
+//       multiplyValues(initialVolumetricFlow, pressureRatio),
+//       temperatureRatio
+//     );
 
-//     reactantInitialAmounts.forEach((amount, index) => {
-//       const ratio = amount / reactantCoefficients[index];
-//       if (ratio < minRatio) {
-//         minRatio = ratio;
-//         limitingIndex = index;
-//       }
-//     });
+//     // Calculate total initial molar flow rate (sum of all initial flows)
+//     const totalInitialMolarFlow =
+//       (reactantInitialAmounts.reduce((sum, amount) => sum + amount, 0) +
+//         productInitialAmounts.reduce((sum, amount) => sum + amount, 0) +
+//         nonReactingInitialAmounts.reduce((sum, amount) => sum + amount, 0)) *
+//       initialVolumetricFlow;
+
+//     // Calculate the coefficient for ξ in total molar flow
+//     const xiCoefficient =
+//       productCoefficients.reduce((sum, coeff) => sum + coeff, 0) -
+//       reactantCoefficients.reduce((sum, coeff) => sum + coeff, 0);
 
 //     return (
 //       <div className="stoichiometric-table">
-//         <h3>Stoichiometric Table</h3>
+//         <h3>Stoichiometric Table (Molar Flow Rates in mol/s)</h3>
 //         <table>
 //           <thead>
 //             <tr>
 //               <th>Species</th>
-//               <th>Initial Amount (M)</th>
-//               <th>Change (M)</th>
-//               <th>Final Amount (M)</th>
+//               <th>Initial Flow Rate (F₀)</th>
+//               <th>Change (ΔF)</th>
+//               <th>Final Flow Rate (F)</th>
 //             </tr>
 //           </thead>
 //           <tbody>
 //             {/* Reactants */}
-//             {reactantCoefficients.map((coeff, index) => (
-//               <tr key={`reactant-row-${index}`}>
-//                 <td>
-//                   A<sub>{index + 1}</sub>
-//                 </td>
-//                 <td>{reactantInitialAmounts[index].toFixed(2)}</td>
-//                 <td>-{coeff}ξ</td>
-//                 <td>
-//                   {index === limitingIndex
-//                     ? "0 (limiting)"
-//                     : `${(
-//                         reactantInitialAmounts[index] -
-//                         coeff * minRatio
-//                       ).toFixed(2)}`}
-//                 </td>
-//               </tr>
-//             ))}
+//             {reactantCoefficients.map((coeff, index) => {
+//               const initialFlow = (
+//                 reactantInitialAmounts[index] * initialVolumetricFlow
+//               ).toFixed(4);
+//               const change = `-${coeff}ξ`;
+//               const finalFlow = `${initialFlow} - ${coeff}ξ`;
+//               return (
+//                 <tr key={`reactant-row-${index}`}>
+//                   <td>
+//                     A<sub>{index + 1}</sub>
+//                   </td>
+//                   <td>{initialFlow}</td>
+//                   <td>{change}</td>
+//                   <td>{finalFlow}</td>
+//                 </tr>
+//               );
+//             })}
 
 //             {/* Products */}
-//             {productCoefficients.map((coeff, index) => (
-//               <tr key={`product-row-${index}`}>
-//                 <td>
-//                   B<sub>{index + 1}</sub>
-//                 </td>
-//                 <td>{productInitialAmounts[index].toFixed(2)}</td>
-//                 <td>+{coeff}ξ</td>
-//                 <td>
-//                   {(productInitialAmounts[index] + coeff * minRatio).toFixed(2)}
-//                 </td>
-//               </tr>
-//             ))}
+//             {productCoefficients.map((coeff, index) => {
+//               const initialFlow = (
+//                 productInitialAmounts[index] * initialVolumetricFlow
+//               ).toFixed(4);
+//               const change = `+${coeff}ξ`;
+//               const finalFlow = `${initialFlow} + ${coeff}ξ`;
+//               return (
+//                 <tr key={`product-row-${index}`}>
+//                   <td>
+//                     B<sub>{index + 1}</sub>
+//                   </td>
+//                   <td>{initialFlow}</td>
+//                   <td>{change}</td>
+//                   <td>{finalFlow}</td>
+//                 </tr>
+//               );
+//             })}
 
 //             {/* Non-reacting elements */}
-//             {nonReactingInitialAmounts.map((amount, index) => (
-//               <tr key={`nonreacting-row-${index}`}>
-//                 <td>
-//                   I<sub>{index + 1}</sub>
-//                 </td>
-//                 <td>{amount.toFixed(2)}</td>
-//                 <td>0</td>
-//                 <td>{amount.toFixed(2)}</td>
-//               </tr>
-//             ))}
+//             {nonReactingInitialAmounts.map((amount, index) => {
+//               const initialFlow = (amount * initialVolumetricFlow).toFixed(4);
+//               return (
+//                 <tr key={`nonreacting-row-${index}`}>
+//                   <td>
+//                     I<sub>{index + 1}</sub>
+//                   </td>
+//                   <td>{initialFlow}</td>
+//                   <td>0</td>
+//                   <td>{initialFlow}</td>
+//                 </tr>
+//               );
+//             })}
 //           </tbody>
 //         </table>
-//         <p className="table-note">
-//           Note: ξ represents the extent of reaction (in moles per liter).
-//           {limitingIndex >= 0 && ` Limiting reactant: A${limitingIndex + 1}`}
-//         </p>
+
+//         <div className="total-flow-section">
+//           <h4>Total Molar Flow Rate Calculations</h4>
+//           <p>
+//             <strong>
+//               Total Initial Molar Flow Rate (F<sub>total,0</sub>):
+//             </strong>{" "}
+//             {totalInitialMolarFlow.toFixed(4)} mol/s
+//           </p>
+//           <p>
+//             <strong>
+//               Total Final Molar Flow Rate (F<sub>total</sub>):
+//             </strong>
+//             <br />F<sub>total</sub> = F<sub>total,0</sub> + (Σproduct
+//             coefficients - Σreactant coefficients)ξ
+//           </p>
+//           <p>
+//             F<sub>total</sub> = {totalInitialMolarFlow.toFixed(4)} + (
+//             {xiCoefficient})ξ
+//           </p>
+//         </div>
+
+//         <div className="volumetric-flow-calculation">
+//           <h4>Final Volumetric Flow Rate Calculation</h4>
+//           <p>
+//             V = {initialVolumetricFlow} × ({initialPressure}/{finalPressure}) ×
+//             ({finalTemperature}/{initialTemperature})
+//           </p>
+//           <p>
+//             <strong>Final Volumetric Flow Rate: {finalVolumetricFlow}</strong>
+//           </p>
+//         </div>
 //       </div>
 //     );
 //   };
@@ -727,15 +1207,13 @@ export default ChemistryCalculator;
 //     const productParts = [];
 
 //     for (let i = 0; i < reactantCoefficients.length; i++) {
-//       const coeff =
-//         reactantCoefficients[i] === 1 ? "" : reactantCoefficients[i];
 //       reactantParts.push(
 //         <React.Fragment key={`reactant-${i}`}>
 //           <input
 //             type="number"
 //             className="reaction-input"
 //             value={reactantCoefficients[i]}
-//             min="1"
+//             step="0.1"
 //             onChange={(e) =>
 //               handleCoefficientChange("reactant", i, e.target.value)
 //             }
@@ -747,14 +1225,13 @@ export default ChemistryCalculator;
 //     }
 
 //     for (let i = 0; i < productCoefficients.length; i++) {
-//       const coeff = productCoefficients[i] === 1 ? "" : productCoefficients[i];
 //       productParts.push(
 //         <React.Fragment key={`product-${i}`}>
 //           <input
 //             type="number"
 //             className="reaction-input"
 //             value={productCoefficients[i]}
-//             min="1"
+//             step="0.1"
 //             onChange={(e) =>
 //               handleCoefficientChange("product", i, e.target.value)
 //             }
@@ -779,21 +1256,18 @@ export default ChemistryCalculator;
 //     const productParts = [];
 
 //     for (let i = 0; i < reactantCoefficients.length; i++) {
-//       const coeff =
-//         reactantCoefficients[i] === 1 ? "" : reactantCoefficients[i];
 //       reactantParts.push(
 //         <React.Fragment key={`reactant-display-${i}`}>
-//           {coeff}A<sub>{i + 1}</sub>
+//           {reactantCoefficients[i]}A<sub>{i + 1}</sub>
 //           {i < reactantCoefficients.length - 1 && " + "}
 //         </React.Fragment>
 //       );
 //     }
 
 //     for (let i = 0; i < productCoefficients.length; i++) {
-//       const coeff = productCoefficients[i] === 1 ? "" : productCoefficients[i];
 //       productParts.push(
 //         <React.Fragment key={`product-display-${i}`}>
-//           {coeff}B<sub>{i + 1}</sub>
+//           {productCoefficients[i]}B<sub>{i + 1}</sub>
 //           {i < productCoefficients.length - 1 && " + "}
 //         </React.Fragment>
 //       );
@@ -884,13 +1358,12 @@ export default ChemistryCalculator;
 //       <div className="rate-law-section">
 //         <h3>Rate Law Parameters</h3>
 //         <div className="input-group">
-//           <label htmlFor="custom-k">Rate Constant (k):</label>
+//           <label htmlFor="custom-k">Rate Constant:</label>
 //           <input
-//             type="number"
+//             type="text"
 //             id="custom-k"
-//             step="0.01"
 //             value={customK}
-//             onChange={(e) => setCustomK(parseFloat(e.target.value) || 1)}
+//             onChange={(e) => setCustomK(e.target.value)}
 //           />
 //         </div>
 
@@ -963,6 +1436,72 @@ export default ChemistryCalculator;
 //     );
 //   };
 
+//   const renderProcessConditions = () => {
+//     return (
+//       <div className="process-conditions">
+//         <h3>Process Conditions</h3>
+
+//         <div className="input-group">
+//           <label htmlFor="initial-flow">Initial Volumetric Flow (dm³/s):</label>
+//           <input
+//             type="number" // Changed from "text" to "number"
+//             id="initial-flow"
+//             step="0.1"
+//             min="0"
+//             value={initialVolumetricFlow}
+//             onChange={(e) =>
+//               setInitialVolumetricFlow(parseFloat(e.target.value) || 0)
+//             }
+//           />
+//         </div>
+
+//         <div className="input-group">
+//           <label htmlFor="initial-pressure">Initial Pressure (atm):</label>
+//           <input
+//             type="text"
+//             id="initial-pressure"
+//             value={initialPressure}
+//             onChange={(e) => setInitialPressure(e.target.value)}
+//           />
+//         </div>
+
+//         <div className="input-group">
+//           <label htmlFor="initial-temperature">Initial Temperature (K):</label>
+//           <input
+//             type="text"
+//             id="initial-temperature"
+//             value={initialTemperature}
+//             onChange={(e) => setInitialTemperature(e.target.value)}
+//           />
+//         </div>
+
+//         <div className="input-group">
+//           <label htmlFor="final-pressure">Final Pressure (atm):</label>
+//           <input
+//             type="text"
+//             id="final-pressure"
+//             value={finalPressure}
+//             onChange={(e) => setFinalPressure(e.target.value)}
+//           />
+//         </div>
+
+//         <div className="input-group">
+//           <label htmlFor="final-temperature">Final Temperature (K):</label>
+//           <input
+//             type="text"
+//             id="final-temperature"
+//             value={finalTemperature}
+//             onChange={(e) => setFinalTemperature(e.target.value)}
+//           />
+//         </div>
+//         <div className="input-group">
+//           <label>Extent of Reaction:</label>
+//           <span className="extent-display">ξ</span>
+//         </div>
+//       </div>
+//     );
+//   };
+
 //   return (
 //     <div id="chemistry-calculator">
 //       <div className="calculator-title">Chemistry Reaction Calculator</div>
@@ -992,6 +1531,7 @@ export default ChemistryCalculator;
 //       </div>
 
 //       {renderNonReactingSection()}
+//       {renderProcessConditions()}
 
 //       <button onClick={generateReaction}>Generate Reaction</button>
 
